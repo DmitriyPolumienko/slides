@@ -1,11 +1,13 @@
 <?php
 namespace App\Models;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Presentation extends Model
 {
+    use HasFactory;
     protected $fillable = ['title', 'project_id', 'theme_id', 'language_id', 'master_template_id', 'header_options', 'footer_options', 'status'];
     protected $casts = [
         'header_options' => 'array',
