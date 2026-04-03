@@ -7,6 +7,61 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## 🚀 No-code Render Deploy
+
+Deploy the Slides app to [Render](https://render.com) in a few clicks — no terminal required.
+
+### Step 1 — Fork or use this repo
+
+Make sure the repository is on your GitHub account (or an organization you own).
+
+### Step 2 — Create a Blueprint on Render
+
+1. Go to [render.com](https://render.com) and sign in.
+2. Click **New +** → **Blueprint**.
+3. Connect your GitHub account if prompted, then select the **slides** repository.
+4. Click **Apply** / **Connect**.
+
+Render will automatically create:
+- **Web service** (Laravel app)
+- **Worker service** (queue processor)
+- **PostgreSQL** database
+- **Redis** instance
+
+### Step 3 — Set required environment variables
+
+After the Blueprint is created, go to the **Web service** → **Environment** tab and add:
+
+| Variable | Value |
+|---|---|
+| `OPENAI_API_KEY` | Your OpenAI API key (get one at [platform.openai.com](https://platform.openai.com/api-keys)) |
+
+Everything else (database, Redis, app key) is configured automatically by the Blueprint.
+
+> **Note:** Do the same for the **Worker service** — set `OPENAI_API_KEY` there too.
+
+### Step 4 — Deploy
+
+Click **Save Changes** / **Deploy** and wait for the status to show **Live** (usually 3–5 minutes).
+
+### Step 5 — Verify the app is running
+
+1. Click **Open in browser** on the Web service.
+2. You should see the presentations list page.
+3. Confirm the health endpoint works: open `https://your-app.onrender.com/health` — it should return `{"status":"ok"}`.
+
+### Troubleshooting
+
+| Problem | What to do |
+|---|---|
+| **Build failed** | Check the **Logs** tab in the web service. Most common cause: a missing system package. Open an issue with the log output. |
+| **App shows error on boot** | Usually `APP_KEY` missing — Render generates it automatically via the Blueprint. If missing, go to **Environment** → add `APP_KEY` and run `php artisan key:generate --show` locally to get a value. |
+| **"OPENAI_API_KEY not set"** | Go to Web service → **Environment** → add `OPENAI_API_KEY`. Redeploy. |
+| **Database migration errors** | Check Logs. Migrations run automatically on startup. If they fail, you can trigger a manual deploy to retry. |
+| **Queue jobs not processing** | Make sure the **Worker service** is also running (green status) and has the same env vars as the web service. |
+
+---
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

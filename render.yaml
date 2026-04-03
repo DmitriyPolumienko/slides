@@ -1,0 +1,132 @@
+services:
+  - type: web
+    name: slides-web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        fromService:
+          name: slides-web
+          type: web
+          property: host
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: error
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: slides-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: slides-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: slides-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: slides-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: slides-db
+          property: password
+      - key: REDIS_URL
+        fromService:
+          name: slides-redis
+          type: redis
+          property: connectionString
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: CACHE_STORE
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+
+  - type: worker
+    name: slides-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: php artisan queue:work --sleep=3 --tries=3 --timeout=90 --queue=default
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        fromService:
+          name: slides-web
+          type: web
+          envVarKey: APP_KEY
+      - key: APP_URL
+        fromService:
+          name: slides-web
+          type: web
+          property: host
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: error
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: slides-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: slides-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: slides-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: slides-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: slides-db
+          property: password
+      - key: REDIS_URL
+        fromService:
+          name: slides-redis
+          type: redis
+          property: connectionString
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: CACHE_STORE
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+      - key: OPENAI_API_KEY
+        fromService:
+          name: slides-web
+          type: web
+          envVarKey: OPENAI_API_KEY
+      - key: OPENAI_MODEL
+        value: gpt-4o
+
+databases:
+  - name: slides-db
+    databaseName: slides
+    user: slides
+
+  - name: slides-redis
+    type: redis
