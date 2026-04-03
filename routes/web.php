@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PresentationController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/health', [HealthController::class, 'check'])->name('health');
 
 Route::get('/', fn() => redirect()->route('presentations.index'));
 
