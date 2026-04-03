@@ -1,3 +1,6 @@
+# Deployment: Render (backend API + worker) + Vercel (frontend) + Supabase (Postgres)
+# Redis removed — queue uses database driver; cache and session use file driver.
+# No Render-managed Postgres — connect to Supabase via DB_* env vars below.
 services:
   - type: web
     name: slides-web
@@ -20,48 +23,37 @@ services:
         value: stderr
       - key: LOG_LEVEL
         value: error
+      # --- Supabase Postgres credentials ---
+      # sync: false means you must enter these manually in the Render dashboard (Environment tab).
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        fromDatabase:
-          name: slides-db
-          property: host
+        sync: false
       - key: DB_PORT
-        fromDatabase:
-          name: slides-db
-          property: port
+        value: "5432"
       - key: DB_DATABASE
-        fromDatabase:
-          name: slides-db
-          property: database
+        sync: false
       - key: DB_USERNAME
-        fromDatabase:
-          name: slides-db
-          property: user
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase:
-          name: slides-db
-          property: password
-      - key: REDIS_URL
-        fromService:
-          name: slides-redis
-          type: redis
-          property: connectionString
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      # --- Queue / cache / session (no Redis) ---
       - key: QUEUE_CONNECTION
-        value: redis
+        value: database
       - key: CACHE_STORE
-        value: redis
+        value: file
       - key: SESSION_DRIVER
-        value: redis
+        value: file
+      # --- CORS: optional — set to your Vercel frontend URL to enable cross-origin requests.
+      # Leave unset (or empty) if not using a separate frontend on Vercel. ---
+      - key: FRONTEND_URL
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o
-
-  - type: redis
-    name: slides-redis
-    plan: starter
-    ipAllowList: []
 
   - type: worker
     name: slides-worker
@@ -87,39 +79,40 @@ services:
         value: stderr
       - key: LOG_LEVEL
         value: error
+      # --- Supabase Postgres (shared from web service) ---
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        fromDatabase:
-          name: slides-db
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: slides-db
-          property: port
-      - key: DB_DATABASE
-        fromDatabase:
-          name: slides-db
-          property: database
-      - key: DB_USERNAME
-        fromDatabase:
-          name: slides-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: slides-db
-          property: password
-      - key: REDIS_URL
         fromService:
-          name: slides-redis
-          type: redis
-          property: connectionString
+          name: slides-web
+          type: web
+          envVarKey: DB_HOST
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_DATABASE
+        fromService:
+          name: slides-web
+          type: web
+          envVarKey: DB_DATABASE
+      - key: DB_USERNAME
+        fromService:
+          name: slides-web
+          type: web
+          envVarKey: DB_USERNAME
+      - key: DB_PASSWORD
+        fromService:
+          name: slides-web
+          type: web
+          envVarKey: DB_PASSWORD
+      - key: DB_SSLMODE
+        value: require
+      # --- Queue / cache / session (no Redis) ---
       - key: QUEUE_CONNECTION
-        value: redis
+        value: database
       - key: CACHE_STORE
-        value: redis
+        value: file
       - key: SESSION_DRIVER
-        value: redis
+        value: file
       - key: OPENAI_API_KEY
         fromService:
           name: slides-web
@@ -127,8 +120,3 @@ services:
           envVarKey: OPENAI_API_KEY
       - key: OPENAI_MODEL
         value: gpt-4o
-
-databases:
-  - name: slides-db
-    databaseName: slides
-    user: slides

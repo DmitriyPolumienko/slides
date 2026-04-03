@@ -7,48 +7,97 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## 🚀 No-code Render Deploy
+## 🚀 Low-cost Deploy: Vercel + Render + Supabase
 
-Deploy the Slides app to [Render](https://render.com) in a few clicks — no terminal required.
+This stack is optimised for small traffic (≤ 2 concurrent users).  
+**Redis and Render-managed Postgres are removed** — queues use the database driver, sessions and cache use the filesystem.
 
-### Step 1 — Fork or use this repo
+| Layer | Service | Notes |
+|---|---|---|
+| Frontend (Blade/Livewire) | [Render](https://render.com) web service | Served by the same Laravel container |
+| Backend API + queue worker | [Render](https://render.com) | Deployed from `render.yaml` Blueprint |
+| Database | [Supabase](https://supabase.com) Postgres | Free tier available |
+| Redis | **none** | Removed — not needed at this scale |
 
-Make sure the repository is on your GitHub account (or an organization you own).
+---
 
-### Step 2 — Create a Blueprint on Render
+### Step 1 — Create a Supabase database
 
-1. Go to [render.com](https://render.com) and sign in.
-2. Click **New +** → **Blueprint**.
-3. Connect your GitHub account if prompted, then select the **slides** repository.
-4. Click **Apply** / **Connect**.
+1. Go to [supabase.com](https://supabase.com), create a free account and a new **Project**.
+2. Once the project is ready, open **Project Settings → Database**.
+3. Copy the connection details you will need:
+   - **Host** (looks like `db.<project-ref>.supabase.co`)
+   - **Database name** (usually `postgres`)
+   - **User** (usually `postgres`)
+   - **Password** (the one you chose when creating the project)
+   - **Port** (`5432`)
 
-Render will automatically create:
-- **Web service** (Laravel app)
-- **Worker service** (queue processor)
-- **PostgreSQL** database
-- **Redis** instance
+---
 
-### Step 3 — Set required environment variables
+### Step 2 — Deploy backend to Render
 
-After the Blueprint is created, go to the **Web service** → **Environment** tab and add:
+1. Go to [render.com](https://render.com), sign in, click **New +** → **Blueprint**.
+2. Connect your GitHub account and select this repository.
+3. Click **Apply** / **Connect**.
 
-| Variable | Value |
+Render will create:
+- **slides-web** — Laravel web service
+- **slides-worker** — queue worker
+
+> No Postgres or Redis is provisioned by Render — the database lives in Supabase (see Step 3).
+
+---
+
+### Step 3 — Set required environment variables in Render
+
+After the Blueprint is created, go to **slides-web → Environment** and fill in:
+
+| Variable | Where to get it |
 |---|---|
-| `OPENAI_API_KEY` | Your OpenAI API key (get one at [platform.openai.com](https://platform.openai.com/api-keys)) |
+| `DB_HOST` | Supabase → Project Settings → Database → Host |
+| `DB_DATABASE` | Supabase → usually `postgres` |
+| `DB_USERNAME` | Supabase → usually `postgres` |
+| `DB_PASSWORD` | Supabase → your project password |
+| `OPENAI_API_KEY` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `FRONTEND_URL` | Your Vercel app URL, e.g. `https://your-app.vercel.app` (optional, enables CORS) |
 
-Everything else (database, Redis, app key) is configured automatically by the Blueprint.
+`DB_PORT`, `DB_SSLMODE`, `QUEUE_CONNECTION`, `SESSION_DRIVER`, `CACHE_STORE`, and `APP_KEY` are pre-configured automatically by the Blueprint — no action needed.
 
-> **Note:** Do the same for the **Worker service** — set `OPENAI_API_KEY` there too.
+The **slides-worker** service inherits `DB_*` and `OPENAI_API_KEY` from `slides-web` automatically.
 
-### Step 4 — Deploy
+---
 
-Click **Save Changes** / **Deploy** and wait for the status to show **Live** (usually 3–5 minutes).
+### Step 4 — Run database migrations
 
-### Step 5 — Verify the app is running
+After the first deploy completes, open **slides-web → Shell** (or trigger a one-off job) and run:
 
-1. Click **Open in browser** on the Web service.
+```bash
+php artisan migrate --force
+```
+
+> Migrations also run automatically on every deploy via the Docker start script.
+
+---
+
+### Step 5 — (Optional) Deploy frontend to Vercel
+
+If you build a separate frontend (e.g. Next.js), deploy it to [vercel.com](https://vercel.com):
+
+1. Import this repository (or a separate frontend repo) into Vercel.
+2. Set `NEXT_PUBLIC_API_URL` (or equivalent) to your Render web service URL.
+3. Copy the Vercel deployment URL and paste it as `FRONTEND_URL` in Render (enables CORS).
+
+For the default Blade/Livewire UI, the frontend is already served by the Laravel container on Render — no separate Vercel deployment is needed.
+
+---
+
+### Step 6 — Verify the app is running
+
+1. Click **Open in browser** on the **slides-web** service in Render.
 2. You should see the presentations list page.
-3. Confirm the health endpoint works: open `https://your-app.onrender.com/health` — it should return `{"status":"ok"}`.
+3. Confirm the health endpoint: `https://your-app.onrender.com/health` → `{"status":"ok"}`.
+
+---
 
 ### Troubleshooting
 
@@ -56,9 +105,11 @@ Click **Save Changes** / **Deploy** and wait for the status to show **Live** (us
 |---|---|
 | **Build failed** | Check the **Logs** tab in the web service. Most common cause: a missing system package. Open an issue with the log output. |
 | **App shows error on boot** | Usually `APP_KEY` missing — Render generates it automatically via the Blueprint. If missing, go to **Environment** → add `APP_KEY` and run `php artisan key:generate --show` locally to get a value. |
-| **"OPENAI_API_KEY not set"** | Go to Web service → **Environment** → add `OPENAI_API_KEY`. Redeploy. |
-| **Database migration errors** | Check Logs. Migrations run automatically on startup. If they fail, you can trigger a manual deploy to retry. |
-| **Queue jobs not processing** | Make sure the **Worker service** is also running (green status) and has the same env vars as the web service. |
+| **Database connection error** | Double-check the `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` values in Render match your Supabase project. Ensure `DB_SSLMODE=require`. |
+| **"OPENAI_API_KEY not set"** | Go to **slides-web → Environment** → add `OPENAI_API_KEY`. Redeploy. |
+| **Migration errors on first deploy** | Run `php artisan migrate --force` manually via Render Shell, or trigger a new deploy. |
+| **Queue jobs not processing** | Make sure **slides-worker** is running (green status) in Render. |
+| **CORS errors from Vercel** | Set `FRONTEND_URL` to your Vercel domain in the **slides-web** environment. |
 
 ---
 
