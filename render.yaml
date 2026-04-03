@@ -58,6 +58,11 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4o
 
+  - type: redis
+    name: slides-redis
+    plan: starter
+    ipAllowList: []
+
   - type: worker
     name: slides-worker
     runtime: docker
@@ -127,6 +132,3 @@ databases:
   - name: slides-db
     databaseName: slides
     user: slides
-
-  - name: slides-redis
-    type: redis
