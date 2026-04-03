@@ -132,4 +132,3 @@ databases:
   - name: slides-db
     databaseName: slides
     user: slides
-    plan: starter
